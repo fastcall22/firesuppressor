@@ -1,0 +1,12 @@
+version: "0.2"
+language: "en"
+allowCompoundWords: true
+
+dictionaries:
+  - en_US
+  - java
+  - softwareTerms
+
+words:
+  - curseforge
+  - firesuppressor
