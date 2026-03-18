@@ -18,4 +18,4 @@ While there may be some non-zero performance impact, it should be mitigated by t
 
 - Add other versions of Minecraft to build system. The fire tick game rule and behavior has changed drastically a few times in its history.
 
-- Add Curseforge variant. Or something.
+- Add Forge variant. Or something.

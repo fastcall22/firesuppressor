@@ -39,13 +39,12 @@ public class FireSuppressorMod implements ModInitializer {
         // get fire spread radius
         final PoiManager poi = self.getPoiManager();
         final int MAX_RANGE = self.getGameRules().get(GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER);
-        final double MAX_RANGE_SQ = MAX_RANGE * MAX_RANGE;
+        final double MAX_RANGE_SQ = MAX_RANGE >= 0 ? MAX_RANGE * MAX_RANGE : Double.POSITIVE_INFINITY;
 
-        if ( MAX_RANGE <= 0 ) {
-            // should be impossible?
-            FireSuppressorMod.LOGGER.warn("any_cauldron_nearby, but MAX_RANGE is {}", MAX_RANGE);
+        if ( MAX_RANGE_SQ == 0 ) {
             return false;
         }
+
 
         // search nearby cauldrons
         final var closest_poi_cauldron = poi.findClosest(
