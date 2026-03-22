@@ -1,10 +1,10 @@
 {
     "schemaVersion": 1,
     "id": "firesuppressor",
-    "version": "1.0.0",
-    "name": "Fire Suppressor",
+    "version": "1.1.0",
+    "name": "Fire Suppressing Cauldrons",
     "description":
-        "Disables fire spread around cauldrons.",
+        "Disables fire spread within range of any cauldrons.",
 
     "authors": [
         "fastcall22"

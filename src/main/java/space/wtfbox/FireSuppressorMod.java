@@ -2,6 +2,7 @@ package space.wtfbox;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.BlockPos;
@@ -36,42 +37,46 @@ public class FireSuppressorMod implements ModInitializer {
         net.minecraft.server.level.ServerLevel self,
         BlockPos at
     ) {
-        // get fire spread radius
-        final PoiManager poi = self.getPoiManager();
-        final int MAX_RANGE = self.getGameRules().get(GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER);
-        final double MAX_RANGE_SQ = MAX_RANGE >= 0 ? MAX_RANGE * MAX_RANGE : Double.POSITIVE_INFINITY;
+        // the server is determined to ignite the block at `at`. check if this block is covered by a cauldron.
+        int fire_spread_radius = self.getGameRules().get(GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER);
 
-        if ( MAX_RANGE_SQ == 0 ) {
-            return false;
+        // derive the protection radius from the `fire_spread_radius` gamerule.
+        // from testing, it seems fire spread is effectively disabled for values 0, 1, and 2.
+        //
+        // R > 2          gamerule range
+        // -1 <= R <= 2   default range
+        // -1 <  R        not possible
+        //
+        int protect_radius = fire_spread_radius;
+        if ( fire_spread_radius <= 2 ) {
+            // when radius is 0, fire/lava spreads, but only to the block a player occupies (in theory)
+            // for other values up to 2, such a small protection range is effectively useless
+            //
+            // in either case, use the default protection range
+            protect_radius = 128;
         }
 
-
         // search nearby cauldrons
-        final var closest_poi_cauldron = poi.findClosest(
+        final int PROTECT_RADIUS_SQ = protect_radius * protect_radius;
+        final PoiManager poi = self.getPoiManager();
+        final var any_poi_cauldron = poi.find(
             holder -> holder.is(PoiTypes.LEATHERWORKER),
-            pos -> at.distSqr(pos) <= MAX_RANGE_SQ,
-            at, MAX_RANGE,
+            pos -> at.distSqr(pos) <= PROTECT_RADIUS_SQ,
+            at, protect_radius,
             PoiManager.Occupancy.ANY
         );
 
-        if ( closest_poi_cauldron.isPresent() ) {
-            FireSuppressorMod.LOGGER.info(
-                "found cauldron at {} for block {}",
-                closest_poi_cauldron.get().toShortString(), at.toShortString()
-            );
-        }
-
         // check any moving cauldrons
         boolean any_cached_cauldron = true;
-        if ( closest_poi_cauldron.isEmpty() ) {
+        if ( any_poi_cauldron.isEmpty() ) {
             var cache = cache_by_poimanager.get(poi);
             any_cached_cauldron = (
                 cache != null
-                && cache.stream().anyMatch(entry -> entry.getLeft().distSqr(at) <= MAX_RANGE_SQ)
+                && cache.stream().anyMatch(entry -> entry.getLeft().distSqr(at) <= PROTECT_RADIUS_SQ)
             );
         }
 
-        return closest_poi_cauldron.isPresent() || any_cached_cauldron;
+        return any_poi_cauldron.isPresent() || any_cached_cauldron;
     }
 
 
@@ -85,8 +90,6 @@ public class FireSuppressorMod implements ModInitializer {
         var cache = cache_by_poimanager.computeIfAbsent(self, k -> new ArrayList<>());
         int expires = FireSuppressorMod.server.getTickCount() + 8;
         cache.add(new ImmutablePair<>(pos, expires));
-
-        LOGGER.debug("cauldron destroyed at: {}", pos.toShortString());
     }
 
 
@@ -95,23 +98,13 @@ public class FireSuppressorMod implements ModInitializer {
             // invalidate cache if (for whatever reason) the server changes
             FireSuppressorMod.server = server;
             FireSuppressorMod.cache_by_poimanager = new HashMap<>();
-            LOGGER.info("initialized");
         }
 
-        int tick_at = server.getTickCount();
 
         // remove expired entries in each dimension
-        for ( var poi_entries_pair : cache_by_poimanager.entrySet() ) {
-            var poi = poi_entries_pair.getKey();
-            var entries = poi_entries_pair.getValue();
-
-            final int before_ct = entries.size();
+        int tick_at = server.getTickCount();
+        for ( var entries : cache_by_poimanager.values() ) {
             entries.removeIf(pos_expires_pair -> tick_at >= pos_expires_pair.getRight());
-
-            final int removed_ct = before_ct - entries.size();
-            if ( removed_ct > 0 ) {
-                LOGGER.debug("removed {} expired entries from {}", removed_ct, poi);
-            }
         }
     }
 }
